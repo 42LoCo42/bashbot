@@ -108,9 +108,9 @@ eventloop() {
 		grep -v "READY" >> "lines" <<< "$line"
 		t="" s="" op="" d=""
 		read -r t s op d <<< "$(jq -c -r ".t, .s, .op, .d" <<< "$line" | tr '\n' ' ')"
-		
+
 		# Save sequence number
-		grep -qv "null" <<< "$s" && echo "$s" > "last_sequence_num"
+		last_sequence_num="$(grep -qv "null" <<< "$s" && echo "$s")"
 
 		# init heartbeat
 		if [ "$heartbeat_active" == "0" ]; then
@@ -121,23 +121,29 @@ eventloop() {
 		if [ "$op" == "10" ]; then
 			info "2" "Received Hello"
 			[ "$logged_in" == "0" ] && {
-				work "2" "Attempting login..."
-				# shellcheck disable=SC2016
-				# nothing to expand
-				printf '{
-					"op": 2,
-					"d": {
-						"token": "%s",
-						"intents": 4608,
-						"properties": {
-							"$os": "linux",
-							"$browser": "foo",
-							"$device": "foo"
+				if [ -f "resume_payload" ]; then
+					work "2" "Resuming last connection..."
+					cat "resume_payload" >> "$fsend"
+					rm "resume_payload"
+				else
+					work "2" "Attempting login..."
+					# shellcheck disable=SC2016
+					# nothing to expand
+					printf '{
+						"op": 2,
+						"d": {
+							"token": "%s",
+							"intents": 4608,
+							"properties": {
+								"$os": "linux",
+								"$browser": "foo",
+								"$device": "foo"
+							}
 						}
-					}
-				}' "$token" \
-				| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
-				>> "$fsend"
+					}' "$token" \
+					| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
+					>> "$fsend"
+				fi
 			}
 
 		# handle disconnection
@@ -151,10 +157,11 @@ eventloop() {
 					"session_id": "%s",
 					"seq": "%s"
 				}
-			}' "$token" "$(< "session_id")" "$(< "last_sequence_num")" \
+			}' "$token" "$session_id" "$last_sequence_num" \
 			| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
-			>> "$fsend"
-		
+			> "resume_payload"
+			stopall
+
 		# TODO: handle Resumed event
 		# I need its identifier which the docs not give
 
@@ -170,7 +177,7 @@ eventloop() {
 		# logged in, save session id
 		elif [ "$t" == "READY" ]; then
 			info "2" "Login successful"
-			jq -r ".session_id" <<< "$d" > "session_id"
+			session_id="$(jq -r ".session_id" <<< "$d")"
 			logged_in=1
 			my_status="online"
 
