@@ -105,7 +105,7 @@ eventloop() {
 	info "0" "Event loop initialized"
 	while [ -f "running" ]; do
 		line="$(readlobu "$frecv" | tr -d '\0' | sed -E "s|^(> )*||g")"
-		grep -v "READY" >> "lines" <<< "$line"
+		cat >> "lines" <<< "$line"
 		t="" s="" op="" d=""
 		read -r t s op d <<< "$(jq -c -r ".t, .s, .op, .d" <<< "$line" | tr '\n' ' ')"
 
@@ -149,7 +149,7 @@ eventloop() {
 		# handle disconnection
 		elif [ "$op" == "7" ]; then
 			crit "2" "We were disconnected!"
-			work "2" "Attempting to resume..."
+			work "2" "Creating resume payload..."
 			printf '{
 				"op": 6,
 				"d": {
@@ -161,9 +161,6 @@ eventloop() {
 			| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
 			> "resume_payload"
 			stopall
-
-		# TODO: handle Resumed event
-		# I need its identifier which the docs not give
 
 		# handle invalid session
 		elif [ "$op" == "9" ]; then
