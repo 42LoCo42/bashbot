@@ -97,6 +97,10 @@ readlobu() {
 	done
 }
 
+fixmystatus() {
+	: "${my_status:=online}"
+}
+
 eventloop() {
 	local line
 	local logged_in=0
@@ -180,6 +184,7 @@ eventloop() {
 
 		# some defaults
 		elif [ "$t" == "MESSAGE_CREATE" ]; then
+			fixmystatus
 			IFS=$'\n' read -r -d '' author author_id content <<< \
 				"$(jq -r ".author.username, .author.id, .content" <<< "$d")"
 			handle_message
@@ -187,6 +192,7 @@ eventloop() {
 			my_status="$(jq -r ".status" <<< "$d")"
 			info "*" "You are now $my_status"
 		else
+			fixmystatus
 			warn "2" "Unhandled event: t = $t s = $s op = $op"
 		fi
 	done
