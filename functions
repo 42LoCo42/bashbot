@@ -67,6 +67,7 @@ handle_message() {
 	else
 		# respond when not online and direct message
 		[ "$my_status" != "online" ] && \
+		[ "$content" != "k" ] && \
 		[ "$(get_channel_type "$channel_id")" == "1" ] && {
 			send_msg "$channel_id" "Ich bin gerade nicht da"
 		}

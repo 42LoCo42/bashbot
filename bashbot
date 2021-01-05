@@ -2,5 +2,13 @@
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
 
 while true; do
+	cat << EOF
+
+Bashbot by Leon Schumacher
+Version $(git rev-parse --short HEAD)
+Last commit msg: $(git log -1 --pretty=%B | tr -d '\n')
+Now starting...
+
+EOF
 	bash main
 done
