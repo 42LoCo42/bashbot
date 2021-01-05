@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
 
+git pull
+
 while true; do
 	cat << EOF
 
