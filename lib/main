@@ -162,8 +162,12 @@ eventloop() {
 	done
 }
 
-work "0" "Preparing connection to gateway..."
-wscat -c "$gateway" <"$fsend_f" >"$frecv_f" &
+work "0" "Opening connection to gateway..."
+{
+	wscat -c "$gateway" <"$fsend_f" >"$frecv_f"
+	crit "0" "The websocket was closed!"
+	stopall
+} &
 
 touch "$running_f"
 generic_log "[38;5;5m" "NFTY" "∞" "Infinity is now realized"
