@@ -26,8 +26,21 @@ cleanup() {
 trap cleanup EXIT
 
 work "0" "Requesting gateway from REST API..."
-gateway="$(curl -sL "https://discord.com/api/v8/gateway" | jq -r ".url")"
-info "0" "Got gateway: $gateway"
+gateway_res="$(
+	curl -sL "https://discord.com/api/v8/gateway" \
+	| tee -a "$lines_f"
+)"
+echo >> "$lines_f"
+gateway="$(jq -r ".url" <<< "$gateway_res")"
+ping_url="${gateway#wss://}"
+info "0" "Response is $gateway_res, URL is $gateway"
+work "0" "Testing gateway..."
+ping -c 1 "$ping_url" >/dev/null 2>&1 || {
+	crit "0" "Could not ping gateway!"
+	work "0" "Sleeping for 5 seconds to allow API to reload..."
+	sleep 5
+	stopall
+}
 gateway="$gateway/?v=8&encoding=json"
 info "0" "Modified gateway to $gateway"
 
