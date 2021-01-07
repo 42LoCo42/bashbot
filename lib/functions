@@ -12,8 +12,8 @@ rest_req() {
 		-H "Authorization: $raw_token" \
 		-H "Content-Type: application/json" \
 		"https://discord.com/api/v8${call}" "$@" \
-	| tee -a "lines"
-	echo >> "lines"
+	| tee -a "$lines_f"
+	echo >> "$lines_f"
 }
 
 # status
@@ -65,12 +65,14 @@ handle_message() {
 		echo "$nlws" | grep -qE "^bwd$" && \
 		set_my_status "online" && work "*" "Setting status to online..."
 	else
-		# respond when not online and direct message
-		[ "$my_status" != "online" ] && \
-		[ "$content" != "k" ] && \
-		[ "$(get_channel_type "$channel_id")" == "1" ] && {
-			send_msg "$channel_id" "Ich bin gerade nicht da"
-		}
+		# TODO this gets a major rework
+		# # respond when not online and direct message
+		# [ "$my_status" != "online" ] && \
+		# [ "$content" != "k" ] && \
+		# [ "$(get_channel_type "$channel_id")" == "1" ] && {
+		# 	send_msg "$channel_id" "Ich bin gerade nicht da"
+		# }
+		true
 	fi
 
 	[ "$content" == "!laugh" ] && {

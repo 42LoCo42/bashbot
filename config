@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+interactive=0
+log_heartbeat=0

@@ -12,5 +12,5 @@ Last commit msg: $(git log -1 --pretty=%B | tr -d '\n')
 Now starting...
 
 EOF
-	bash main
+	bash "lib/main"
 done

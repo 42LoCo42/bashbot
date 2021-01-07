@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+root_d="$(dirname "$(readlink -f "$0")")/.."
+
+config_f="$root_d/config"
+token_f="$root_d/token"
+resume_payload_f="$root_d/resume_payload"
+
+tmp_d="$root_d/tmp"
+fsend_f="$tmp_d/fsend"
+frecv_f="$tmp_d/frecv"
+lines_f="$tmp_d/lines"
+log_f="$tmp_d/log"
+running_f="$tmp_d/running"
+heartbeat_no_ack_f="$tmp_d/heartbeat_no_ack"

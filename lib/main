@@ -1,92 +1,29 @@
 #!/usr/bin/env bash
 
-fsend="fsend"
-frecv="frecv"
-raw_token="$(< "token")"
+die() {
+	echo "$@"
+	exit 1
+}
+
+# Setp environment
+source "lib/paths"
+cd "$root_d" || die "Could not find root directory $root_d"
+rm -rf "$tmp_d"
+mkdir "$tmp_d"
+mkfifo "$fsend_f"
+touch "$frecv_f" "$lines_f" "$log_f"
+
+raw_token="$(< "$token_f")"
 token="${raw_token#Bot }"
 
-interactive=0
+source "$config_f"
+source "lib/utils"
+source "lib/functions"
 
-source "functions"
-
-cleanup-start() {
-	rm -f "log" "lines" "last_sequence_num" "session_id" "heartbeat_no_ack"
+cleanup() {
+	rm -f "$fsend_f" "$frecv_f" "$running_f" "$heartbeat_no_ack_f"
 }
-cleanup-start
-
-cleanup-exit() {
-	rm -f "$fsend" "$frecv" "running" "heartbeat_no_ack"
-}
-trap cleanup-exit EXIT
-
-# color type ID msg
-generic_log() {
-	printf "[1m[%s%s[38;5;15m] [%s] [%s] %s%s[m\n" \
-		"$1" "$2" "$3" "$(date)" "$1" "$4" \
-	| tee -a "log"
-}
-
-# ID msg
-work() {
-	generic_log "[38;5;4m" "WORK" "$1" "$2"
-}
-
-# ID msg
-info() {
-	generic_log "[38;5;2m" "INFO" "$1" "$2"
-}
-
-# ID msg
-warn() {
-	generic_log "[38;5;3m" "WARN" "$1" "$2"
-}
-
-# ID msg
-crit() {
-	generic_log "[38;5;1m" "CRIT" "$1" "$2"
-}
-
-# file
-readlobu() {
-	while [ -f "running" ]; do
-		if grep -zqP "\n" "$1"; then
-			{
-				flock -x 3
-				sed 1q "$1"
-				printf '\0' >"$1"
-			} 3<>"$1"
-			break
-		else
-			inotifywait -qq -e modify "$1"
-		fi
-	done
-}
-
-fixmystatus() {
-	: "${my_status:=online}"
-}
-
-stopall() {
-	rm "running"
-	printf 'ERROR\n' >> "$fsend"
-	generic_log "[38;5;5m" "NFTY" "ø" "Infinity is now diminished"
-	exit
-}
-
-resume() {
-	work "2" "Creating resume payload..."
-	printf '{
-		"op": 6,
-		"d": {
-			"token": "%s",
-			"session_id": "%s",
-			"seq": "%s"
-		}
-	}' "$token" "$session_id" "$last_sequence_num" \
-	| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
-	> "resume_payload"
-	stopall
-}
+trap cleanup EXIT
 
 work "0" "Requesting gateway from REST API..."
 gateway="$(curl -sL "https://discord.com/api/v8/gateway" | jq -r ".url")"
@@ -110,16 +47,16 @@ try_heartbeat() {
 }
 
 heartbeat() {
-	while [ -f "running" ]; do
-		[ -f "heartbeat_no_ack" ] && {
+	while [ -f "$running_f" ]; do
+		[ -f "$heartbeat_no_ack_f" ] && {
 			crit "1" "No heartbeat ACK after full period!"
-			rm "heartbeat_no_ack"
+			rm "$heartbeat_no_ack_f"
 			stopall
 		}
-		work "1" "Sending heartbeat"
-		touch "heartbeat_no_ack"
-		echo '{"op":1, "d":null}' >> "$fsend"
-		inotifywait -qq -e delete_self -t "$1" "running"
+		[ "$log_heartbeat" == "1" ] && work "1" "Sending heartbeat"
+		touch "$heartbeat_no_ack_f"
+		echo '{"op":1, "d":null}' >> "$fsend_f"
+		inotifywait -qq -e delete_self -t "$1" "$running_f"
 	done
 }
 
@@ -129,9 +66,9 @@ eventloop() {
 	local t s op d
 
 	info "0" "Event loop initialized"
-	while [ -f "running" ]; do
-		line="$(readlobu "$frecv" | tr -d '\0' | sed -E "s|^(> )*||g")"
-		cat >> "lines" <<< "$line"
+	while [ -f "$running_f" ]; do
+		line="$(readlobu "$frecv_f" | tr -d '\0' | sed -E "s|^(> )*||g")"
+		cat >> "$lines_f" <<< "$line"
 		t="" s="" op="" d=""
 		read -r t s op d <<< "$(jq -c -r ".t, .s, .op, .d" <<< "$line" | tr '\n' ' ')"
 
@@ -147,10 +84,10 @@ eventloop() {
 		if [ "$op" == "10" ]; then
 			info "2" "Received Hello"
 			[ "$logged_in" == "0" ] && {
-				if [ -f "resume_payload" ]; then
+				if [ -f "$resume_payload_f" ]; then
 					work "2" "Resuming last connection..."
-					cat "resume_payload" >> "$fsend"
-					rm "resume_payload"
+					cat "$resume_payload_f" >> "$fsend_f"
+					rm "$resume_payload_f"
 				else
 					work "2" "Attempting login..."
 					# shellcheck disable=SC2016
@@ -168,7 +105,7 @@ eventloop() {
 						}
 					}' "$token" \
 					| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
-					>> "$fsend"
+					>> "$fsend_f"
 				fi
 			}
 
@@ -184,8 +121,8 @@ eventloop() {
 
 		# heartbeat_active ACK
 		elif [ "$op" == "11" ]; then
-			info "1" "Received heartbeat ACK"
-			rm "heartbeat_no_ack"
+			[ "$log_heartbeat" == "1" ] && info "1" "Received heartbeat ACK"
+			rm "$heartbeat_no_ack_f"
 
 		# logged in, save session id
 		elif [ "$t" == "READY" ]; then
@@ -200,9 +137,11 @@ eventloop() {
 			IFS=$'\n' read -r -d '' author author_id content <<< \
 				"$(jq -r ".author.username, .author.id, .content" <<< "$d")"
 			handle_message
+
 		elif [ "$t" == "USER_SETTINGS_UPDATE" ]; then
 			my_status="$(jq -r ".status" <<< "$d")"
 			info "*" "You are now $my_status"
+
 		else
 			fixmystatus
 			warn "2" "Unhandled event: t = $t s = $s op = $op"
@@ -211,11 +150,9 @@ eventloop() {
 }
 
 work "0" "Preparing connection to gateway..."
-mkfifo "$fsend"
-touch "$frecv"
-wscat -c "$gateway" <"$fsend" >"$frecv" &
+wscat -c "$gateway" <"$fsend_f" >"$frecv_f" &
 
-touch "running"
+touch "$running_f"
 generic_log "[38;5;5m" "NFTY" "∞" "Infinity is now realized"
 work "0" "Loading event loop..."
 eventloop &
@@ -223,10 +160,10 @@ sleep 1
 
 work "0" "Stabilizing communication channels..."
 if [ "$interactive" == "0" ]; then
-	while [ -f "running" ]; do
-		inotifywait -qq -e delete_self "running"
-	done >"$fsend"
+	while [ -f "$running_f" ]; do
+		inotifywait -qq -e delete_self "$running_f"
+	done >"$fsend_f"
 else
 	crit "2" "Interactive mode enabled"
-	cat - >"$fsend"
+	cat - >"$fsend_f"
 fi
