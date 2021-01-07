@@ -16,7 +16,7 @@ touch "$frecv_f" "$lines_f" "$log_f"
 raw_token="$(< "$token_f")"
 token="${raw_token#Bot }"
 
-source "$config_f"
+source "config"
 source "lib/utils"
 source "lib/functions"
 
@@ -165,8 +165,11 @@ eventloop() {
 work "0" "Opening connection to gateway..."
 {
 	wscat -c "$gateway" <"$fsend_f" >"$frecv_f"
-	crit "0" "The websocket was closed!"
-	stopall
+	# if the running file still exists, the websocket was closed remotely
+	# otherwise, it was deleted by stopall so we don't need to run it again
+	[ -f "$running_f" ] \
+		&& crit "0" "The websocket was closed!" \
+		&& stopall
 } &
 
 touch "$running_f"

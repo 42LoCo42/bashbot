@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "lib/paths"
+
 # color type ID msg
 generic_log() {
 	printf "[1m[%s%s[38;5;15m] [%s] [%s] %s%s[m\n" \
@@ -49,7 +51,7 @@ fixmystatus() {
 
 stopall() {
 	rm "$running_f"
-	printf 'ERROR\n' >> "$fsend_f"
+	printf '\x4' >> "$fsend_f"
 	generic_log "[38;5;5m" "NFTY" "ø" "Infinity is now diminished"
 	exit
 }
