@@ -50,7 +50,7 @@ fixmystatus() {
 }
 
 stopall() {
-	rm "$running_f"
+	rm -f "$running_f"
 	printf '\x4' >> "$fsend_f"
 	generic_log "[38;5;5m" "NFTY" "ø" "Infinity is now diminished"
 	exit
