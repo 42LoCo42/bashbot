@@ -10,8 +10,8 @@ source "lib/paths"
 cd "$root_d" || die "Could not find root directory $root_d"
 rm -rf "$tmp_d"
 mkdir "$tmp_d"
-mkfifo "$fsend_f"
 touch "$frecv_f" "$lines_f" "$log_f"
+# only create fsend_f when a connection exists
 
 raw_token="$(< "$token_f")"
 token="${raw_token#Bot }"
@@ -99,7 +99,7 @@ eventloop() {
 			[ "$logged_in" == "0" ] && {
 				if [ -f "$resume_payload_f" ]; then
 					work "2" "Resuming last connection..."
-					cat "$resume_payload_f" >> "$fsend_f"
+					tee -a "$fsend_f" < "$resume_payload_f"
 					rm "$resume_payload_f"
 				else
 					work "2" "Attempting login..."
@@ -145,6 +145,9 @@ eventloop() {
 			my_status="online"
 
 		# some defaults
+		elif [ "$t" == "MESSAGE_ACK" ]; then
+			continue
+
 		elif [ "$t" == "MESSAGE_CREATE" ]; then
 			fixmystatus
 			IFS=$'\n' read -r -d '' author author_id content <<< \
@@ -155,6 +158,11 @@ eventloop() {
 			my_status="$(jq -r ".status" <<< "$d")"
 			info "*" "You are now $my_status"
 
+		elif [ "$t" == "PRESENCE_UPDATE" ]; then
+			IFS=$'\n' read -r -d '' username status <<< \
+				"$(jq -r ".user.username, .status" <<< "$d")"
+			info "*" "$username is now $status!"
+
 		else
 			fixmystatus
 			warn "2" "Unhandled event: t = $t s = $s op = $op"
@@ -162,6 +170,7 @@ eventloop() {
 	done
 }
 
+mkfifo "$fsend_f"
 work "0" "Opening connection to gateway..."
 {
 	wscat -c "$gateway" <"$fsend_f" >"$frecv_f"

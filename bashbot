@@ -7,8 +7,11 @@ while true; do
 	cat << EOF
 
 Bashbot by Leon Schumacher
-Version $(git rev-parse --short HEAD)
-Last commit msg: $(git log -1 --pretty=%B | tr -d '\n')
+Last commit hash: $(git rev-parse --short HEAD)
+Last commit mesg: $(
+	git log --oneline -2 --format=%s | grep -v "Merge" \
+	| sed 1q | tr -d '\n'
+)
 Now starting...
 
 EOF
