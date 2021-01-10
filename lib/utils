@@ -2,6 +2,12 @@
 
 source "lib/paths"
 
+# name...
+setname() {
+	# shellcheck disable=SC2059
+	printf "$@" > /proc/self/comm
+}
+
 # color type ID msg
 generic_log() {
 	printf "[1m[%s%s[38;5;15m] [%s] [%s] %s%s[m\n" \
@@ -31,6 +37,8 @@ crit() {
 
 # file
 readlobu() {
+	setname "readlobu"
+
 	while [ -f "$running_f" ]; do
 		if grep -zqP "\n" "$1"; then
 			{
@@ -53,8 +61,9 @@ stopall() {
 	rm -f "$running_f"
 	printf '\x4' >> "$fsend_f"
 	generic_log "[38;5;5m" "NFTY" "ø" "Infinity is now diminished"
-	exit
 }
+
+declare token session_id last_sequence_num
 
 resume() {
 	work "2" "Creating resume payload..."
