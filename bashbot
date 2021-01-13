@@ -8,10 +8,7 @@ while true; do
 
 Bashbot by Leon Schumacher
 Last commit hash: $(git rev-parse --short HEAD)
-Last commit mesg: $(
-	git log --oneline -2 --format=%s | grep -v "Merge" \
-	| sed 1q | tr -d '\n'
-)
+Last commit mesg: $(git log --oneline --no-merges -1 --format=%s)
 Now starting...
 
 EOF
