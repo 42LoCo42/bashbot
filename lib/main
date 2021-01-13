@@ -69,6 +69,7 @@ heartbeat() {
 			crit "1" "No heartbeat ACK after full period!"
 			rm "$heartbeat_no_ack_f"
 			stopall
+			return
 		}
 		[ "$log_heartbeat" == "1" ] && work "1" "Sending heartbeat"
 		touch "$heartbeat_no_ack_f"
@@ -104,9 +105,13 @@ eventloop() {
 			info "2" "Received Hello"
 			[ "$logged_in" == "0" ] && {
 				if [ -f "$resume_payload_f" ]; then
-					work "2" "Resuming last connection..."
-					tee -a "$fsend_f" < "$resume_payload_f"
+					# work "2" "Resuming last connection..."
+					# tee -a "$fsend_f" < "$resume_payload_f"
+					# rm "$resume_payload_f"
+
+					crit "2" "Resuming currently disabled due to bugs!"
 					rm "$resume_payload_f"
+					stopall
 				else
 					work "2" "Attempting login..."
 					# shellcheck disable=SC2016
@@ -131,7 +136,8 @@ eventloop() {
 		# handle disconnection
 		elif [ "$op" == "7" ]; then
 			crit "2" "We were disconnected!"
-			resume
+			# resume
+			stopall
 
 		# handle invalid session
 		elif [ "$op" == "9" ]; then
