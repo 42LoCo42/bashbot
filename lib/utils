@@ -11,7 +11,7 @@ setname() {
 # color type ID msg
 generic_log() {
 	printf "[1m[%s%s[38;5;15m] [%s] [%s] %s%s[m\n" \
-		"$1" "$2" "$3" "$(date)" "$1" "$4" \
+		"$1" "$2" "$3" "$(date +"%a %b %d %T %Z %Y")" "$1" "$4" \
 	| tee -a "$log_f"
 }
 
